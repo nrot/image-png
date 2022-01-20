@@ -22,7 +22,9 @@ include = [
 [dependencies]
 bitflags = "1.0"
 crc32fast = "1.2.0"
-deflate = "0.9"
+deflate = "1.0.0"
+tokio = {version = "1.15", features=["fs", "io-util"], optional=true}
+
 [dependencies.miniz_oxide]
 version = "0.4.1"
 features = ["no_extern_crate_alloc"]
@@ -40,8 +42,12 @@ features = ["glutin"]
 default-features = false
 
 [features]
+default = ["async"]
+
 unstable = []
 benchmarks = []
+async = ["tokio"]
+
 
 [[bench]]
 path = "benches/decoder.rs"
