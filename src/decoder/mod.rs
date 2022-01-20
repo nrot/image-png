@@ -16,6 +16,9 @@ use crate::utils;
 #[cfg(feature = "async")]
 mod async_decoder;
 
+#[cfg(feature="async")]
+pub use self::async_decoder::{AsyncDecoder, AsyncReader};
+
 /*
 pub enum InterlaceHandling {
     /// Outputs the raw rows

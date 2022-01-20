@@ -24,10 +24,10 @@ bitflags = "1.0"
 crc32fast = "1.2.0"
 deflate = "1.0.0"
 tokio = {version = "1.15", features=["fs", "io-util"], optional=true}
+async-trait = {version = "0.1.52", optional=true}
 
 [dependencies.miniz_oxide]
 version = "0.5.1"
-# features = ["no_extern_crate_alloc"]
 
 [dev-dependencies]
 criterion = "0.3.1"
@@ -47,7 +47,7 @@ default = ["async"]
 
 unstable = []
 benchmarks = []
-async = ["tokio"]
+async = ["tokio", "async-trait"]
 
 
 [[bench]]

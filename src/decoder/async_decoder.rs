@@ -1,9 +1,12 @@
 use super::stream::{Decoded, DecodingError, StreamingDecoder};
 use super::stream::{FormatErrorInner, CHUNCK_BUFFER_SIZE};
 
-use std::mem;
-use tokio::io::{BufReader, AsyncBufReadExt};
+use std::future::Future;
 use std::io::Write;
+use std::marker::PhantomPinned;
+use std::mem;
+use std::pin::Pin;
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader};
 
 use crate::chunk;
 use crate::common::{
@@ -16,6 +19,8 @@ use super::{
     expand_gray_u8, expand_paletted, InterlaceInfo, InterlaceIter, InterlacedRow, Limits,
     OutputInfo, Row, SubframeIdx, SubframeInfo,
 };
+
+use tokio::pin;
 
 macro_rules! get_info(
     ($this:expr) => {
@@ -32,7 +37,6 @@ pub struct AsyncDecoder<R: AsyncBufReadExt> {
     /// Limits on resources the Decoder is allowed to use
     limits: Limits,
 }
-
 
 impl<R: AsyncBufReadExt + Unpin> AsyncDecoder<R> {
     /// Create a new decoder configuration with default limits.
@@ -116,12 +120,15 @@ struct AsyncReadDecoder<R: AsyncBufReadExt> {
     at_eof: bool,
 }
 
-impl<R: AsyncBufReadExt + Unpin> Unpin for AsyncReadDecoder<R>{}
+impl<R: AsyncBufReadExt + Unpin> Unpin for AsyncReadDecoder<R> {}
 
 impl<R: AsyncBufReadExt + Unpin> AsyncReadDecoder<R> {
     /// Returns the next decoded chunk. If the chunk is an ImageData chunk, its contents are written
     /// into image_data.
-    async fn decode_next(&mut self, image_data: &mut Vec<u8>) -> Result<Option<Decoded>, DecodingError> {
+    async fn decode_next(
+        &mut self,
+        image_data: &mut Vec<u8>,
+    ) -> Result<Option<Decoded>, DecodingError> {
         while !self.at_eof {
             let (consumed, result) = {
                 let buf = self.reader.fill_buf().await?;
@@ -171,7 +178,6 @@ impl<R: AsyncBufReadExt + Unpin> AsyncReadDecoder<R> {
     fn info(&self) -> Option<&Info> {
         self.decoder.info.as_ref()
     }
-
 }
 
 /// PNG reader (mostly high-level interface)
@@ -402,12 +408,15 @@ impl<'a, R: AsyncBufReadExt + Unpin> AsyncReader<R> {
 
     /// Returns the next processed row of the image
     pub async fn next_row(&'a mut self) -> Result<Option<Row<'a>>, DecodingError> {
-        self.next_interlaced_row().await
+        self.next_interlaced_row()
+            .await
             .map(move |v| v.map(|v| Row { data: v.data }))
     }
 
     /// Returns the next processed row of the image
-    pub async fn next_interlaced_row(&'a mut self) -> Result<Option<InterlacedRow<'a>>, DecodingError> {
+    pub async fn next_interlaced_row(
+        &'a mut self,
+    ) -> Result<Option<InterlacedRow<'a>>, DecodingError> {
         match self.next_interlaced_row_impl().await {
             Err(err) => Err(err),
             Ok(None) => Ok(None),
@@ -416,7 +425,9 @@ impl<'a, R: AsyncBufReadExt + Unpin> AsyncReader<R> {
     }
 
     /// Fetch the next interlaced row and filter it according to our own transformations.
-    async fn next_interlaced_row_impl(&'a mut self) -> Result<Option<InterlacedRow<'a>>, DecodingError> {
+    async fn next_interlaced_row_impl(
+        &'a mut self,
+    ) -> Result<Option<InterlacedRow<'a>>, DecodingError> {
         use crate::common::ColorType::*;
         let transform = self.transform;
 
@@ -612,7 +623,9 @@ impl<'a, R: AsyncBufReadExt + Unpin> AsyncReader<R> {
 
     /// Returns the next raw scanline of the image interlace pass.
     /// The scanline is filtered against the previous scanline according to the specification.
-    async fn next_raw_interlaced_row(&mut self) -> Result<Option<InterlacedRow<'_>>, DecodingError> {
+    async fn next_raw_interlaced_row(
+        &mut self,
+    ) -> Result<Option<InterlacedRow<'_>>, DecodingError> {
         let bpp = self.bpp;
         let (rowlen, passdata) = match self.next_pass() {
             Some((rowlen, passdata)) => (rowlen, passdata),
@@ -684,8 +697,8 @@ impl<'a, R: AsyncBufReadExt + Unpin> AsyncReader<R> {
 #[cfg(test)]
 mod tests {
     use super::AsyncDecoder;
-    use tokio::io::{AsyncBufReadExt, AsyncRead, Result, AsyncBufRead};
     use std::mem::discriminant;
+    use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, Result};
 
     /// A reader that reads at most `n` bytes.
     struct SmalBuf<R: AsyncBufReadExt + AsyncBufRead> {
@@ -716,7 +729,7 @@ mod tests {
     // }
 
     // impl<R: AsyncBufReadExt> AsyncBufReadExt for SmalBuf<R> {
-        
+
     //     // fn fill_buf(&mut self) -> Result<&[u8]> {
     //     //     let buf = self.inner.fill_buf()?;
     //     //     let len = buf.len().min(self.cap);
@@ -746,7 +759,14 @@ mod tests {
         //     .unwrap()
         //     .next_frame(&mut buffer)
         //     .unwrap_err();
+        let smal = AsyncDecoder::new_with_limits(IMG, crate::Limits { bytes: 1 })
+            .read_info()
+            .await
+            .unwrap()
+            .next_frame(&mut buffer)
+            .await
+            .unwrap_err();
 
-        // assert_eq!(discriminant(&normal), discriminant(&smal));
+        assert_eq!(discriminant(&normal), discriminant(&smal));
     }
 }

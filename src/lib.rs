@@ -65,6 +65,9 @@
 extern crate bitflags;
 
 
+#[cfg(test)]
+mod data_sets;
+
 pub mod chunk;
 mod common;
 mod decoder;
@@ -80,4 +83,9 @@ pub use crate::{
     decoder::{Decoded, Decoder, DecodingError, Limits, OutputInfo, Reader, StreamingDecoder},
     encoder::{Encoder, EncodingError, StreamWriter, Writer},
     filter::{AdaptiveFilterType, FilterType},
+};
+
+#[cfg(feature="async")]
+pub use crate::{
+    decoder::{AsyncReader, AsyncDecoder}
 };
