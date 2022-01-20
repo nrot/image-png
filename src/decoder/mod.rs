@@ -5,7 +5,7 @@ mod zlib;
 use std::ops::Range;
 
 use self::stream::FormatErrorInner;
-pub use self::stream::{Decoded, DecodingError, StreamingDecoder};
+pub use self::stream::{Decoded, DecodingError, StreamingDecoder, CHUNCK_BUFFER_SIZE};
 
 pub use self::sync_decoder::{Decoder, Reader};
 
