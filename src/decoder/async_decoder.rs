@@ -1,12 +1,9 @@
 use super::stream::{Decoded, DecodingError, StreamingDecoder};
 use super::stream::{FormatErrorInner, CHUNCK_BUFFER_SIZE};
 
-use std::future::Future;
 use std::io::Write;
-use std::marker::PhantomPinned;
 use std::mem;
-use std::pin::Pin;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader};
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::chunk;
 use crate::common::{
@@ -19,8 +16,6 @@ use super::{
     expand_gray_u8, expand_paletted, InterlaceInfo, InterlaceIter, InterlacedRow, Limits,
     OutputInfo, Row, SubframeIdx, SubframeInfo,
 };
-
-use tokio::pin;
 
 macro_rules! get_info(
     ($this:expr) => {
@@ -698,19 +693,19 @@ impl<'a, R: AsyncBufReadExt + Unpin> AsyncReader<R> {
 mod tests {
     use super::AsyncDecoder;
     use std::mem::discriminant;
-    use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, Result};
+    use tokio::io::{AsyncBufRead, AsyncBufReadExt};
 
     /// A reader that reads at most `n` bytes.
-    struct SmalBuf<R: AsyncBufReadExt + AsyncBufRead> {
-        inner: R,
-        cap: usize,
-    }
+    // struct SmalBuf<R: AsyncBufReadExt + AsyncBufRead> {
+    //     inner: R,
+    //     cap: usize,
+    // }
 
-    impl<R: AsyncBufReadExt> SmalBuf<R> {
-        fn new(inner: R, cap: usize) -> Self {
-            SmalBuf { inner, cap }
-        }
-    }
+    // impl<R: AsyncBufReadExt> SmalBuf<R> {
+    //     fn new(inner: R, cap: usize) -> Self {
+    //         SmalBuf { inner, cap }
+    //     }
+    // }
 
     // impl<R: AsyncBufReadExt + AsyncRead> AsyncRead for SmalBuf<R>{
     //     fn poll_read(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>, buf: &mut tokio::io::ReadBuf<'_>) -> std::task::Poll<std::io::Result<()>> {
