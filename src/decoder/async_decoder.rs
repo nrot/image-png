@@ -3,7 +3,7 @@ use super::stream::{FormatErrorInner, CHUNCK_BUFFER_SIZE};
 
 use std::io::Write;
 use std::mem;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 
 use crate::chunk;
 use crate::common::{
@@ -24,7 +24,8 @@ macro_rules! get_info(
 );
 
 /// PNG Decoder
-pub struct AsyncDecoder<R: AsyncBufReadExt> {
+#[derive(Debug)]
+pub struct AsyncDecoder<R: Unpin> {
     /// Reader
     r: R,
     /// Output transformations
@@ -33,12 +34,11 @@ pub struct AsyncDecoder<R: AsyncBufReadExt> {
     limits: Limits,
 }
 
-impl<R: AsyncBufReadExt + Unpin> AsyncDecoder<R> {
+impl<R: AsyncRead + Unpin> AsyncDecoder<R> {
     /// Create a new decoder configuration with default limits.
     pub fn new(r: R) -> AsyncDecoder<R> {
         AsyncDecoder::new_with_limits(r, Limits::default())
     }
-
     /// Create a new decoder configuration with custom limits.
     pub fn new_with_limits(r: R, limits: Limits) -> AsyncDecoder<R> {
         AsyncDecoder {
@@ -46,6 +46,32 @@ impl<R: AsyncBufReadExt + Unpin> AsyncDecoder<R> {
             transform: Transformations::IDENTITY,
             limits,
         }
+    }
+
+    /// Reads all meta data until the first IDAT chunk
+    pub async fn read_info(self) -> Result<AsyncReader<R>, DecodingError> {
+        let mut reader =
+            AsyncReader::new(self.r, StreamingDecoder::new(), self.transform, self.limits);
+        reader.init().await?;
+
+        let color_type = reader.info().color_type;
+        let bit_depth = reader.info().bit_depth;
+        if color_type.is_combination_invalid(bit_depth) {
+            return Err(DecodingError::Format(
+                FormatErrorInner::InvalidColorBitDepth {
+                    color: color_type,
+                    depth: bit_depth,
+                }
+                .into(),
+            ));
+        }
+
+        // Check if the output buffer can be represented at all.
+        if reader.checked_output_buffer_size().is_none() {
+            return Err(DecodingError::LimitsExceeded);
+        }
+
+        Ok(reader)
     }
 
     /// Limit resource usage.
@@ -75,32 +101,6 @@ impl<R: AsyncBufReadExt + Unpin> AsyncDecoder<R> {
         self.limits = limits;
     }
 
-    /// Reads all meta data until the first IDAT chunk
-    pub async fn read_info(self) -> Result<AsyncReader<R>, DecodingError> {
-        let mut reader =
-            AsyncReader::new(self.r, StreamingDecoder::new(), self.transform, self.limits);
-        reader.init().await?;
-
-        let color_type = reader.info().color_type;
-        let bit_depth = reader.info().bit_depth;
-        if color_type.is_combination_invalid(bit_depth) {
-            return Err(DecodingError::Format(
-                FormatErrorInner::InvalidColorBitDepth {
-                    color: color_type,
-                    depth: bit_depth,
-                }
-                .into(),
-            ));
-        }
-
-        // Check if the output buffer can be represented at all.
-        if reader.checked_output_buffer_size().is_none() {
-            return Err(DecodingError::LimitsExceeded);
-        }
-
-        Ok(reader)
-    }
-
     /// Set the allowed and performed transformations.
     ///
     /// A transformation is a pre-processing on the raw image data modifying content or encoding.
@@ -109,15 +109,16 @@ impl<R: AsyncBufReadExt + Unpin> AsyncDecoder<R> {
         self.transform = transform;
     }
 }
-struct AsyncReadDecoder<R: AsyncBufReadExt> {
+
+struct AsyncReadDecoder<R: Unpin> {
     reader: BufReader<R>,
     decoder: StreamingDecoder,
     at_eof: bool,
 }
 
-impl<R: AsyncBufReadExt + Unpin> Unpin for AsyncReadDecoder<R> {}
+impl<R: AsyncReadExt + Unpin> Unpin for AsyncReadDecoder<R> {}
 
-impl<R: AsyncBufReadExt + Unpin> AsyncReadDecoder<R> {
+impl<R: AsyncReadExt + Unpin> AsyncReadDecoder<R> {
     /// Returns the next decoded chunk. If the chunk is an ImageData chunk, its contents are written
     /// into image_data.
     async fn decode_next(
@@ -178,7 +179,7 @@ impl<R: AsyncBufReadExt + Unpin> AsyncReadDecoder<R> {
 /// PNG reader (mostly high-level interface)
 ///
 /// Provides a high level that iterates over lines or whole images.
-pub struct AsyncReader<R: AsyncBufReadExt> {
+pub struct AsyncReader<R: Unpin> {
     decoder: AsyncReadDecoder<R>,
     bpp: BytesPerPixel,
     subframe: SubframeInfo,
@@ -200,7 +201,7 @@ pub struct AsyncReader<R: AsyncBufReadExt> {
     limits: Limits,
 }
 
-impl<'a, R: AsyncBufReadExt + Unpin> AsyncReader<R> {
+impl<'a, R: AsyncRead + Unpin> AsyncReader<R> {
     /// Creates a new PNG reader
     fn new(r: R, d: StreamingDecoder, t: Transformations, limits: Limits) -> AsyncReader<R> {
         AsyncReader {

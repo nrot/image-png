@@ -1306,8 +1306,7 @@ mod tests {
     #[tokio::test]
     async fn async_image_source_chromaticities() -> Result<(), ()> {
         async fn trial(path: &str, expected: Option<SourceChromaticities>) {
-            let breader = BufReader::with_capacity(CHUNCK_BUFFER_SIZE, tokio::fs::File::open(path).await.unwrap());
-            let decoder = crate::AsyncDecoder::new(breader);
+            let decoder = crate::AsyncDecoder::new(tokio::fs::File::open(path).await.unwrap());
             let reader = decoder.read_info().await.unwrap();
             let actual: Option<SourceChromaticities> = reader.info().source_chromaticities;
             assert!(actual == expected);
