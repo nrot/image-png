@@ -17,6 +17,8 @@ use crate::text_metadata::{
 };
 use crate::traits::WriteBytesExt;
 
+use crate::common::{SourceChromaticities, SrgbRenderingIntent};
+
 pub type Result<T> = result::Result<T, EncodingError>;
 
 #[derive(Debug)]
@@ -252,7 +254,7 @@ impl<'a, W: Write> Encoder<'a, W> {
     /// of the source system on which the image was generated or last edited.
     pub fn set_source_chromaticities(
         &mut self,
-        source_chromaticities: super::SourceChromaticities,
+        source_chromaticities: SourceChromaticities,
     ) {
         self.info.source_chromaticities = Some(source_chromaticities);
     }
@@ -261,7 +263,7 @@ impl<'a, W: Write> Encoder<'a, W> {
     ///
     /// Matching source gamma and chromaticities chunks are added automatically.
     /// Any manually specified source gamma or chromaticities will be ignored.
-    pub fn set_srgb(&mut self, rendering_intent: super::SrgbRenderingIntent) {
+    pub fn set_srgb(&mut self, rendering_intent: SrgbRenderingIntent) {
         self.info.srgb = Some(rendering_intent);
     }
 
@@ -2233,22 +2235,6 @@ mod tests {
 
         fn flush(&mut self) -> io::Result<()> {
             self.w.flush()
-        }
-    }
-}
-
-/// Mod to encapsulate the converters depending on the `deflate` crate.
-///
-/// Since this only contains trait impls, there is no need to make this public, they are simply
-/// available when the mod is compiled as well.
-impl Compression {
-    fn to_options(self) -> deflate::CompressionOptions {
-        match self {
-            Compression::Default => deflate::CompressionOptions::default(),
-            Compression::Fast => deflate::CompressionOptions::fast(),
-            Compression::Best => deflate::CompressionOptions::high(),
-            Compression::Huffman => deflate::CompressionOptions::huffman_only(),
-            Compression::Rle => deflate::CompressionOptions::rle(),
         }
     }
 }

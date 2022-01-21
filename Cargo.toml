@@ -24,6 +24,7 @@ bitflags = "1.0"
 crc32fast = "1.2.0"
 deflate = "1.0.0"
 tokio = {version = "1.15", features=["fs", "io-util"], default-features=false, optional=true}
+async-trait = "0.1.52"
 
 [dependencies.miniz_oxide]
 version = "0.5.1"
@@ -35,6 +36,7 @@ term = "0.6.1"
 glob = "0.3"
 rand = "0.7.0"
 tokio = {version = "1.15", features=["fs", "io-util", "macros", "rt-multi-thread"]}
+async-trait = "0.1.52"
 
 [dev-dependencies.glium]
 version = "0.24"
