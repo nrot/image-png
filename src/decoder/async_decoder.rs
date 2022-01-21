@@ -694,7 +694,7 @@ impl<'a, R: AsyncRead + Unpin> AsyncReader<R> {
 mod tests {
     use super::AsyncDecoder;
     use std::mem::discriminant;
-    use tokio::io::{AsyncBufRead, AsyncBufReadExt};
+    // use tokio::io::{AsyncBufRead, AsyncBufReadExt};
 
     /// A reader that reads at most `n` bytes.
     // struct SmalBuf<R: AsyncBufReadExt + AsyncBufRead> {
@@ -737,7 +737,7 @@ mod tests {
     //     //     self.inner.consume(amt)
     //     // }
     // }
-
+    //TODO: Add AsyncSmallBuf test/example
     #[tokio::test]
     async fn async_no_data_dup_on_finish() {
         const IMG: &[u8] = include_bytes!(concat!(

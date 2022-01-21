@@ -1315,4 +1315,23 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn async_image_gamma_sync_vs_async()->Result<(), ()>{
+        async fn trial(path: &str, expected: Option<ScaledFloat>) {
+            let adecoder = crate::AsyncDecoder::new(tokio::fs::File::open(path).await.unwrap());
+            let areader = adecoder.read_info().await.unwrap();
+            let aactual: Option<ScaledFloat> = areader.info().source_gamma;
+            assert!(aactual == expected);
+
+            let sdecoder = crate::Decoder::new(File::open(path).unwrap());
+            let sreader = sdecoder.read_info().unwrap();
+            let sactual: Option<ScaledFloat> = sreader.info().source_gamma;
+            assert!(sactual == expected);
+
+            assert!(aactual == sactual);
+        }
+        for _ in for_image_gamma().iter().map(|x| trial(x.path, x.expected)){};
+        Ok(())
+    }
+
 }

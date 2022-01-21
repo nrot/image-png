@@ -23,7 +23,7 @@ include = [
 bitflags = "1.0"
 crc32fast = "1.2.0"
 deflate = "1.0.0"
-tokio = {version = "1.15", features=["fs", "io-util"], optional=true}
+tokio = {version = "1.15", features=["fs", "io-util"], default-features=false, optional=true}
 
 [dependencies.miniz_oxide]
 version = "0.5.1"
